@@ -97,6 +97,24 @@ export function MaterialityInbox({ messages, loadError }: MaterialityInboxProps)
                   <span className="materiality-meta-label">Registrado en el sistema</span>
                   <span className="materiality-meta-value">{formatDate(message.createdAt)}</span>
                 </div>
+
+                <div className="materiality-meta-card">
+                  <span className="materiality-meta-label">PDF enlazado</span>
+                  <span className="materiality-meta-value">
+                    {message.urlDelPdf ? (
+                      <a
+                        className="materiality-link"
+                        href={message.urlDelPdf}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Abrir PDF
+                      </a>
+                    ) : (
+                      "Sin PDF enlazado"
+                    )}
+                  </span>
+                </div>
               </div>
             </article>
           ))}

@@ -5,10 +5,15 @@ const MATERIALITY_EVENT_NAME = "mensaje_del_cliente";
 
 type UnknownRecord = Record<string, unknown>;
 
-type MaterialityInsertPayload = {
+export type MaterialityInsertPayload = {
   correo_peticion: string | null;
   contexto: string | null;
   correo_id: string | null;
+};
+
+export type MaterialityPdfLinkPayload = {
+  id: number;
+  url_del_pdf: string;
 };
 
 type MaterialityRow = {
@@ -17,6 +22,7 @@ type MaterialityRow = {
   correo_peticion: string | null;
   contexto: string | null;
   correo_id: string | null;
+  url_del_pdf: string | null;
 };
 
 export type MaterialityMessage = {
@@ -25,6 +31,7 @@ export type MaterialityMessage = {
   correoPeticion: string;
   contexto: string;
   correoId: string;
+  urlDelPdf: string;
 };
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -47,6 +54,17 @@ function readFirstString(...values: unknown[]) {
   return "";
 }
 
+function parsePositiveInteger(value: unknown) {
+  const normalizedValue = readString(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+  return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : null;
+}
+
 function parseMaterialityRow(row: MaterialityRow): MaterialityMessage {
   return {
     id: row.id,
@@ -54,6 +72,7 @@ function parseMaterialityRow(row: MaterialityRow): MaterialityMessage {
     correoPeticion: readString(row.correo_peticion),
     contexto: readString(row.contexto),
     correoId: readString(row.correo_id),
+    urlDelPdf: readString(row.url_del_pdf),
   };
 }
 
@@ -63,12 +82,7 @@ export function normalizeMaterialityWebhookPayload(body: unknown): MaterialityIn
   }
 
   const event = readString(body.event);
-
-  if (event !== MATERIALITY_EVENT_NAME) {
-    return null;
-  }
-
-  const payload = isRecord(body.payload) ? body.payload : {};
+  const payload = isRecord(body.payload) ? body.payload : body;
 
   const correoPeticion = readFirstString(
     payload.correo_peticion,
@@ -88,10 +102,47 @@ export function normalizeMaterialityWebhookPayload(body: unknown): MaterialityIn
     body.correo_id,
   );
 
+  const hasMeaningfulPayload = Boolean(correoPeticion || contexto || correoId);
+
+  if (event && event !== MATERIALITY_EVENT_NAME) {
+    return null;
+  }
+
+  if (!event && !hasMeaningfulPayload) {
+    return null;
+  }
+
   return {
     correo_peticion: correoPeticion || null,
     contexto: contexto || null,
     correo_id: correoId || null,
+  };
+}
+
+export function normalizeMaterialityPdfLinkPayload(body: unknown): MaterialityPdfLinkPayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const payload = isRecord(body.payload) ? body.payload : body;
+  const id = parsePositiveInteger(payload.id ?? body.id ?? payload.registro_id ?? body.registro_id);
+  const urlDelPdf = readFirstString(
+    payload.url_del_pdf,
+    payload.urlDelPdf,
+    payload.url,
+    payload.pdf_url,
+    body.url_del_pdf,
+    body.url,
+    body.pdf_url,
+  );
+
+  if (!id || !urlDelPdf) {
+    return null;
+  }
+
+  return {
+    id,
+    url_del_pdf: urlDelPdf,
   };
 }
 
@@ -114,9 +165,33 @@ export async function storeMaterialityMessage(payload: MaterialityInsertPayload)
   return rows[0] ? parseMaterialityRow(rows[0]) : null;
 }
 
+export async function attachMaterialityPdfUrl(payload: MaterialityPdfLinkPayload) {
+  const response = await fetch(
+    getSupabaseAdminUrl(`/rest/v1/${MATERIALITY_TABLE}?id=eq.${payload.id}&select=*`),
+    {
+      method: "PATCH",
+      headers: getSupabaseAdminHeaders({
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      }),
+      body: JSON.stringify({
+        url_del_pdf: payload.url_del_pdf,
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`No se pudo enlazar el PDF al registro ${payload.id} en tabla_de_n8n.`);
+  }
+
+  const rows = (await response.json()) as MaterialityRow[];
+  return rows[0] ? parseMaterialityRow(rows[0]) : null;
+}
+
 export async function getMaterialityMessages(limit = 20): Promise<MaterialityMessage[]> {
   const params = new URLSearchParams({
-    select: "id,created_at,correo_peticion,contexto,correo_id",
+    select: "id,created_at,correo_peticion,contexto,correo_id,url_del_pdf",
     order: "id.desc",
     limit: String(Math.max(1, limit)),
   });
