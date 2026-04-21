@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s | Legal Workflow",
   },
   description:
-    "Frontend base para la operacion legal, listo para integracion posterior con Supabase, n8n y despliegue en Vercel.",
+    "Frnd base para la operacion legal, listo para integracion posterior con Supabase, n8n y despliegue en Vercel.",
   applicationName: "Legal Workflow",
 };
 
