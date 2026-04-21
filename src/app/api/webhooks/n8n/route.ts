@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  normalizeMaterialityWebhookPayload,
+  storeMaterialityMessage,
+} from "@/lib/materiality";
 
 function getExpectedSecret() {
   return process.env.N8N_WEBHOOK_SECRET?.trim() ?? "";
@@ -54,6 +58,26 @@ export async function POST(request: NextRequest) {
   }
 
   console.log("[n8n webhook received]", JSON.stringify(body));
+
+  try {
+    const materialityMessage = normalizeMaterialityWebhookPayload(body);
+
+    if (materialityMessage) {
+      await storeMaterialityMessage(materialityMessage);
+    }
+  } catch (error) {
+    console.error("[n8n webhook] could not persist materiality message", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Webhook received but the message could not be stored.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
 
   return NextResponse.json({
     ok: true,
