@@ -32,8 +32,8 @@ export function MaterialityInbox({ messages, loadError }: MaterialityInboxProps)
           <span className="section-kicker">Bandeja n8n activa</span>
           <h1 className="section-title companies-title">Materialidad</h1>
           <p className="section-description">
-            Vista depurada: aqui solo aparecen mensajes del cliente recibidos con el evento{" "}
-            <code>mensaje_del_cliente</code>.
+            Vista conectada a <code>tabla_de_n8n</code>, mostrando los campos{" "}
+            <code>correo_peticion</code>, <code>contexto</code> y <code>correo_id</code>.
           </p>
         </div>
 
@@ -46,8 +46,9 @@ export function MaterialityInbox({ messages, loadError }: MaterialityInboxProps)
 
       {!loadError ? (
         <div className="companies-admin-note">
-          Modo simplificado activo: esta vista reemplaza el contenido mock anterior y solo
-          muestra mensajes guardados desde el webhook de n8n.
+          Modo simplificado activo: el webhook de n8n ahora guarda directo en{" "}
+          <code>tabla_de_n8n</code> y esta pantalla refleja esos registros sin usar el mock
+          anterior.
         </div>
       ) : null}
 
@@ -64,33 +65,32 @@ export function MaterialityInbox({ messages, loadError }: MaterialityInboxProps)
             <article className="materiality-item" key={message.id}>
               <div className="materiality-item-head">
                 <div className="materiality-item-copy">
-                  <span className="section-kicker">{message.source}</span>
+                  <span className="section-kicker">Registro #{message.id}</span>
                   <h2 className="materiality-item-title">
-                    {renderValue(message.nombre, "Mensaje del cliente")}
+                    {renderValue(message.correoId, "Correo ID sin capturar")}
                   </h2>
                 </div>
 
-                <span className="pill accent">{message.event}</span>
+                <span className="pill accent">tabla_de_n8n</span>
               </div>
 
-              <div className="materiality-message-body">{renderValue(message.mensaje)}</div>
+              <div className="materiality-message-body">
+                {renderValue(message.contexto, "Sin contexto recibido")}
+              </div>
 
               <div className="materiality-meta-grid">
                 <div className="materiality-meta-card">
-                  <span className="materiality-meta-label">Correo</span>
-                  <span className="materiality-meta-value">{renderValue(message.correo)}</span>
-                </div>
-
-                <div className="materiality-meta-card">
-                  <span className="materiality-meta-label">Empresa del servicio</span>
+                  <span className="materiality-meta-label">Correo ID</span>
                   <span className="materiality-meta-value">
-                    {renderValue(message.empresaDelServicio)}
+                    {renderValue(message.correoId)}
                   </span>
                 </div>
 
                 <div className="materiality-meta-card">
-                  <span className="materiality-meta-label">Timestamp n8n</span>
-                  <span className="materiality-meta-value">{formatDate(message.timestamp)}</span>
+                  <span className="materiality-meta-label">Correo peticion</span>
+                  <span className="materiality-meta-value">
+                    {renderValue(message.correoPeticion)}
+                  </span>
                 </div>
 
                 <div className="materiality-meta-card">

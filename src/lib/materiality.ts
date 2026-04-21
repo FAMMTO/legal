@@ -1,39 +1,30 @@
 import { getSupabaseAdminHeaders, getSupabaseAdminUrl } from "@/lib/supabase-admin";
 
-const MENSAJES_TABLE = "mensajes";
+const MATERIALITY_TABLE = "tabla_de_n8n";
 const MATERIALITY_EVENT_NAME = "mensaje_del_cliente";
-const MATERIALITY_STORAGE_PREFIX = "N8N-MATERIALIDAD:";
 
 type UnknownRecord = Record<string, unknown>;
 
-type StoredMaterialityMessage = {
-  source: string;
-  event: string;
-  timestamp: string;
-  payload: {
-    nombre: string;
-    correo: string;
-    mensaje: string;
-    empresaDelServicio: string;
-  };
+type MaterialityInsertPayload = {
+  correo_peticion: string | null;
+  contexto: string | null;
+  correo_id: string | null;
 };
 
-type MensajeRow = {
+type MaterialityRow = {
   id: number;
   created_at: string;
-  mensaje_ia_contexto: string | null;
+  correo_peticion: string | null;
+  contexto: string | null;
+  correo_id: string | null;
 };
 
 export type MaterialityMessage = {
   id: number;
   createdAt: string;
-  source: string;
-  event: string;
-  timestamp: string;
-  nombre: string;
-  correo: string;
-  mensaje: string;
-  empresaDelServicio: string;
+  correoPeticion: string;
+  contexto: string;
+  correoId: string;
 };
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -44,39 +35,29 @@ function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function buildMaterialityStorageValue(message: StoredMaterialityMessage) {
-  return `${MATERIALITY_STORAGE_PREFIX}${JSON.stringify(message)}`;
-}
+function readFirstString(...values: unknown[]) {
+  for (const value of values) {
+    const normalizedValue = readString(value);
 
-function parseMaterialityRow(row: MensajeRow): MaterialityMessage | null {
-  const rawValue = row.mensaje_ia_contexto ?? "";
-
-  if (!rawValue.startsWith(MATERIALITY_STORAGE_PREFIX)) {
-    return null;
+    if (normalizedValue) {
+      return normalizedValue;
+    }
   }
 
-  try {
-    const parsed = JSON.parse(
-      rawValue.slice(MATERIALITY_STORAGE_PREFIX.length),
-    ) as StoredMaterialityMessage;
-
-    return {
-      id: row.id,
-      createdAt: row.created_at,
-      source: readString(parsed.source) || "n8n",
-      event: readString(parsed.event) || MATERIALITY_EVENT_NAME,
-      timestamp: readString(parsed.timestamp) || row.created_at,
-      nombre: readString(parsed.payload?.nombre),
-      correo: readString(parsed.payload?.correo),
-      mensaje: readString(parsed.payload?.mensaje),
-      empresaDelServicio: readString(parsed.payload?.empresaDelServicio),
-    };
-  } catch {
-    return null;
-  }
+  return "";
 }
 
-export function normalizeMaterialityWebhookPayload(body: unknown): StoredMaterialityMessage | null {
+function parseMaterialityRow(row: MaterialityRow): MaterialityMessage {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    correoPeticion: readString(row.correo_peticion),
+    contexto: readString(row.contexto),
+    correoId: readString(row.correo_id),
+  };
+}
+
+export function normalizeMaterialityWebhookPayload(body: unknown): MaterialityInsertPayload | null {
   if (!isRecord(body)) {
     return null;
   }
@@ -88,56 +69,60 @@ export function normalizeMaterialityWebhookPayload(body: unknown): StoredMateria
   }
 
   const payload = isRecord(body.payload) ? body.payload : {};
-  const empresaDelServicio =
-    readString(payload.empresa_del_servicio) ||
-    readString(payload["empresa_del_servicio "]) ||
-    readString(payload.empresaDelServicio);
+
+  const correoPeticion = readFirstString(
+    payload.correo_peticion,
+    payload.correoPeticion,
+    payload["Correo peticion"],
+    payload.empresa_del_servicio,
+    payload["empresa_del_servicio "],
+    body.correo_peticion,
+  );
+
+  const contexto = readFirstString(payload.contexto, payload.mensaje, body.contexto);
+  const correoId = readFirstString(
+    payload.correo_id,
+    payload.correoId,
+    payload.correo,
+    payload.nombre,
+    body.correo_id,
+  );
 
   return {
-    source: readString(body.source) || "n8n",
-    event,
-    timestamp: readString(body.timestamp) || new Date().toISOString(),
-    payload: {
-      nombre: readString(payload.nombre),
-      correo: readString(payload.correo),
-      mensaje: readString(payload.mensaje),
-      empresaDelServicio,
-    },
+    correo_peticion: correoPeticion || null,
+    contexto: contexto || null,
+    correo_id: correoId || null,
   };
 }
 
-export async function storeMaterialityMessage(message: StoredMaterialityMessage) {
-  const response = await fetch(getSupabaseAdminUrl(`/rest/v1/${MENSAJES_TABLE}`), {
+export async function storeMaterialityMessage(payload: MaterialityInsertPayload) {
+  const response = await fetch(getSupabaseAdminUrl(`/rest/v1/${MATERIALITY_TABLE}`), {
     method: "POST",
     headers: getSupabaseAdminHeaders({
       "Content-Type": "application/json",
       Prefer: "return=representation",
     }),
-    body: JSON.stringify({
-      mensaje_ia_contexto: buildMaterialityStorageValue(message),
-    }),
+    body: JSON.stringify(payload),
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo guardar el mensaje de materialidad en Supabase.");
+    throw new Error("No se pudo guardar el registro de n8n en tabla_de_n8n.");
   }
 
-  const rows = (await response.json()) as MensajeRow[];
+  const rows = (await response.json()) as MaterialityRow[];
   return rows[0] ? parseMaterialityRow(rows[0]) : null;
 }
 
 export async function getMaterialityMessages(limit = 20): Promise<MaterialityMessage[]> {
   const params = new URLSearchParams({
-    select: "id,created_at,mensaje_ia_contexto",
+    select: "id,created_at,correo_peticion,contexto,correo_id",
     order: "id.desc",
     limit: String(Math.max(1, limit)),
   });
 
-  params.set("mensaje_ia_contexto", `like.${MATERIALITY_STORAGE_PREFIX}*`);
-
   const response = await fetch(
-    getSupabaseAdminUrl(`/rest/v1/${MENSAJES_TABLE}?${params.toString()}`),
+    getSupabaseAdminUrl(`/rest/v1/${MATERIALITY_TABLE}?${params.toString()}`),
     {
       method: "GET",
       headers: getSupabaseAdminHeaders(),
@@ -146,12 +131,9 @@ export async function getMaterialityMessages(limit = 20): Promise<MaterialityMes
   );
 
   if (!response.ok) {
-    throw new Error("No se pudieron cargar los mensajes de materialidad desde Supabase.");
+    throw new Error("No se pudieron cargar los registros de tabla_de_n8n desde Supabase.");
   }
 
-  const rows = (await response.json()) as MensajeRow[];
-
-  return rows
-    .map((row) => parseMaterialityRow(row))
-    .filter((row): row is MaterialityMessage => row !== null);
+  const rows = (await response.json()) as MaterialityRow[];
+  return rows.map((row) => parseMaterialityRow(row));
 }

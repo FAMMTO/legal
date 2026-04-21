@@ -14,7 +14,7 @@ export default async function MaterialidadPage() {
     return (
       <MaterialityInbox
         messages={[]}
-        loadError="No pude leer la bandeja de materialidad desde Supabase. Revisa las variables de entorno y el acceso a la tabla mensajes."
+        loadError="No pude leer la bandeja de materialidad desde Supabase. Revisa las variables de entorno y el acceso a la tabla tabla_de_n8n."
       />
     );
   }
