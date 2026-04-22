@@ -9,6 +9,9 @@ export type MaterialityInsertPayload = {
   correo_peticion: string | null;
   contexto: string | null;
   correo_id: string | null;
+  account_id: number | null;
+  conversation_id: number | null;
+  inbox_id: number | null;
 };
 
 export type MaterialityPdfLinkPayload = {
@@ -16,13 +19,16 @@ export type MaterialityPdfLinkPayload = {
   url_del_pdf: string;
 };
 
-type MaterialityRow = {
+export type MaterialityDatabaseRow = {
   id: number;
   created_at: string;
   correo_peticion: string | null;
   contexto: string | null;
   correo_id: string | null;
   url_del_pdf: string | null;
+  account_id: number | null;
+  conversation_id: number | null;
+  inbox_id: number | null;
 };
 
 export type MaterialityMessage = {
@@ -32,6 +38,9 @@ export type MaterialityMessage = {
   contexto: string;
   correoId: string;
   urlDelPdf: string;
+  accountId: string;
+  conversationId: string;
+  inboxId: string;
 };
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -65,7 +74,22 @@ function parsePositiveInteger(value: unknown) {
   return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : null;
 }
 
-function parseMaterialityRow(row: MaterialityRow): MaterialityMessage {
+function parseNullableNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalizedValue = readString(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function parseMaterialityRow(row: MaterialityDatabaseRow): MaterialityMessage {
   return {
     id: row.id,
     createdAt: row.created_at,
@@ -73,6 +97,9 @@ function parseMaterialityRow(row: MaterialityRow): MaterialityMessage {
     contexto: readString(row.contexto),
     correoId: readString(row.correo_id),
     urlDelPdf: readString(row.url_del_pdf),
+    accountId: row.account_id === null ? "" : String(row.account_id),
+    conversationId: row.conversation_id === null ? "" : String(row.conversation_id),
+    inboxId: row.inbox_id === null ? "" : String(row.inbox_id),
   };
 }
 
@@ -101,8 +128,15 @@ export function normalizeMaterialityWebhookPayload(body: unknown): MaterialityIn
     payload.nombre,
     body.correo_id,
   );
+  const accountId = parseNullableNumber(payload.account_id ?? payload.accountId ?? body.account_id);
+  const conversationId = parseNullableNumber(
+    payload.conversation_id ?? payload.conversationId ?? body.conversation_id,
+  );
+  const inboxId = parseNullableNumber(payload.inbox_id ?? payload.inboxId ?? body.inbox_id);
 
-  const hasMeaningfulPayload = Boolean(correoPeticion || contexto || correoId);
+  const hasMeaningfulPayload = Boolean(
+    correoPeticion || contexto || correoId || accountId || conversationId || inboxId,
+  );
 
   if (event && event !== MATERIALITY_EVENT_NAME) {
     return null;
@@ -116,6 +150,9 @@ export function normalizeMaterialityWebhookPayload(body: unknown): MaterialityIn
     correo_peticion: correoPeticion || null,
     contexto: contexto || null,
     correo_id: correoId || null,
+    account_id: accountId,
+    conversation_id: conversationId,
+    inbox_id: inboxId,
   };
 }
 
@@ -161,7 +198,7 @@ export async function storeMaterialityMessage(payload: MaterialityInsertPayload)
     throw new Error("No se pudo guardar el registro de n8n en tabla_de_n8n.");
   }
 
-  const rows = (await response.json()) as MaterialityRow[];
+  const rows = (await response.json()) as MaterialityDatabaseRow[];
   return rows[0] ? parseMaterialityRow(rows[0]) : null;
 }
 
@@ -185,13 +222,32 @@ export async function attachMaterialityPdfUrl(payload: MaterialityPdfLinkPayload
     throw new Error(`No se pudo enlazar el PDF al registro ${payload.id} en tabla_de_n8n.`);
   }
 
-  const rows = (await response.json()) as MaterialityRow[];
+  const rows = (await response.json()) as MaterialityDatabaseRow[];
   return rows[0] ? parseMaterialityRow(rows[0]) : null;
+}
+
+export async function getMaterialityRecordById(id: number) {
+  const response = await fetch(
+    getSupabaseAdminUrl(`/rest/v1/${MATERIALITY_TABLE}?id=eq.${id}&select=*`),
+    {
+      method: "GET",
+      headers: getSupabaseAdminHeaders(),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`No se pudo cargar el registro ${id} de tabla_de_n8n.`);
+  }
+
+  const rows = (await response.json()) as MaterialityDatabaseRow[];
+  return rows[0] ?? null;
 }
 
 export async function getMaterialityMessages(limit = 20): Promise<MaterialityMessage[]> {
   const params = new URLSearchParams({
-    select: "id,created_at,correo_peticion,contexto,correo_id,url_del_pdf",
+    select:
+      "id,created_at,correo_peticion,contexto,correo_id,url_del_pdf,account_id,conversation_id,inbox_id",
     order: "id.desc",
     limit: String(Math.max(1, limit)),
   });
@@ -209,6 +265,6 @@ export async function getMaterialityMessages(limit = 20): Promise<MaterialityMes
     throw new Error("No se pudieron cargar los registros de tabla_de_n8n desde Supabase.");
   }
 
-  const rows = (await response.json()) as MaterialityRow[];
+  const rows = (await response.json()) as MaterialityDatabaseRow[];
   return rows.map((row) => parseMaterialityRow(row));
 }
