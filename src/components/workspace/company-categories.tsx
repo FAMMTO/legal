@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CompaniesViewTabs } from "@/components/workspace/companies-view-tabs";
+import { LiveRefreshControls } from "@/components/workspace/live-refresh-controls";
 import type { CompanyCategory } from "@/lib/companies";
 
 type CompanyCategoriesProps = {
@@ -24,8 +25,12 @@ export function CompanyCategories({ categories }: CompanyCategoriesProps) {
 
         <div className="companies-toolbar-side">
           <CompaniesViewTabs activeView="categorias" />
-          <div className="companies-summary">
-            {categories.length} {categories.length === 1 ? "categoria disponible" : "categorias disponibles"}
+          <div className="companies-toolbar-actions">
+            <LiveRefreshControls />
+            <div className="companies-summary">
+              {categories.length}{" "}
+              {categories.length === 1 ? "categoria disponible" : "categorias disponibles"}
+            </div>
           </div>
         </div>
       </div>

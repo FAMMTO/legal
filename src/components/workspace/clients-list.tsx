@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChangeEvent, useState, useTransition } from "react";
 import type { ClientColumn, ClientRow } from "@/lib/clients";
 import { ExpandableTextModal } from "@/components/ui/expandable-text-modal";
+import { LiveRefreshControls } from "@/components/workspace/live-refresh-controls";
 
 type ClientsListProps = {
   columns: ClientColumn[];
@@ -308,6 +309,10 @@ export function ClientsList({
 
         <div className="companies-toolbar-side">
           <div className="companies-toolbar-actions">
+            <LiveRefreshControls
+              pauseAutoRefresh={isEditMode || isMutating}
+              disabled={isMutating}
+            />
             <button
               className="primary-button companies-edit-button"
               type="button"

@@ -621,6 +621,10 @@ button {
   min-height: 46px;
 }
 
+.companies-refresh-button {
+  min-height: 46px;
+}
+
 .companies-summary {
   padding: 12px 14px;
   border-radius: 14px;

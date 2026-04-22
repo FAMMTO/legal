@@ -1,4 +1,5 @@
 import type { MaterialityMessage } from "@/lib/materiality";
+import { LiveRefreshControls } from "@/components/workspace/live-refresh-controls";
 
 type MaterialityInboxProps = {
   messages: MaterialityMessage[];
@@ -37,8 +38,13 @@ export function MaterialityInbox({ messages, loadError }: MaterialityInboxProps)
           </p>
         </div>
 
-        <div className="companies-summary">
-          {loadError ? "Sin lectura" : `${messages.length} registros de materialidad`}
+        <div className="companies-toolbar-side">
+          <div className="companies-toolbar-actions">
+            <LiveRefreshControls />
+            <div className="companies-summary">
+              {loadError ? "Sin lectura" : `${messages.length} registros de materialidad`}
+            </div>
+          </div>
         </div>
       </div>
 

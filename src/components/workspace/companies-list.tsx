@@ -6,6 +6,7 @@ import { ChangeEvent, useState, useTransition } from "react";
 import type { CompanieColumn, CompanieRow } from "@/lib/companies";
 import { CompaniesViewTabs } from "@/components/workspace/companies-view-tabs";
 import { ExpandableTextModal } from "@/components/ui/expandable-text-modal";
+import { LiveRefreshControls } from "@/components/workspace/live-refresh-controls";
 
 type CompaniesListProps = {
   columns: CompanieColumn[];
@@ -335,6 +336,10 @@ export function CompaniesList({
         <div className="companies-toolbar-side">
           <CompaniesViewTabs activeView="todas" />
           <div className="companies-toolbar-actions">
+            <LiveRefreshControls
+              pauseAutoRefresh={isEditMode || isMutating}
+              disabled={isMutating}
+            />
             <button
               className="primary-button companies-edit-button"
               type="button"
